@@ -26,6 +26,7 @@ import os
 import sys
 from typing import List, Optional
 
+from . import installers
 from . import protocol as p
 from . import spool
 
@@ -145,6 +146,13 @@ def _doctor_checks() -> List[dict]:
     else:
         add("protocol version", True, f"{p.PEER_PROTOCOL}, matching every live session")
 
+    for client in installers.all_clients():
+        if not client.present():
+            continue
+        wired = client.installed()
+        add(f"client: {client.label}", True if wired else None,
+            "configured" if wired else f"present but not configured. Run: agentbus install {client.name}")
+
     return checks
 
 
@@ -188,6 +196,60 @@ def cmd_drain(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _selected_clients(names: List[str]) -> List:
+    """No names means every client this machine actually has."""
+    if not names:
+        return [c for c in installers.all_clients() if c.present()]
+    chosen = []
+    for name in names:
+        client = installers.by_name(name)
+        if client is None:
+            hint = installers.PLUGIN_HOSTS.get(name)
+            if hint:
+                _err(f"{name} needs its own adapter, which this installer does not ship yet. See docs/adding-an-agent.md.")
+            else:
+                known = ", ".join(c.name for c in installers.all_clients())
+                _err(f"Unknown client \"{name}\". Known: {known}")
+            return []
+        chosen.append(client)
+    return chosen
+
+
+def _run_install(args: argparse.Namespace, uninstall: bool) -> int:
+    clients = _selected_clients(args.clients)
+    if not clients:
+        if args.clients:
+            return EXIT_USAGE
+        _err("No supported agent found on this machine.")
+        return EXIT_NOT_WIRED
+    results = []
+    for client in clients:
+        try:
+            action = client.uninstall if uninstall else client.install
+            results.append(action(dry_run=args.dry_run))
+        except OSError as e:
+            _err(f"{client.name}: {e}")
+            return EXIT_FAIL
+    if args.json:
+        print(json.dumps([r.as_dict() for r in results], indent=2))
+        return EXIT_OK
+    for r in results:
+        print(f"{'changed' if r.changed else 'ok     '} {r.client}: {r.detail}")
+        if r.backup:
+            print(f"         backup: {r.backup}")
+    if not uninstall and any(r.changed for r in results) and not args.dry_run:
+        print("\nRestart the agents you just configured for them to pick this up.")
+    return EXIT_OK
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    return _run_install(args, uninstall=False)
+
+
+def cmd_uninstall(args: argparse.Namespace) -> int:
+    return _run_install(args, uninstall=True)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agentbus",
@@ -197,6 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  agentbus list                          who is reachable right now\n"
             "  agentbus send cc-myproject \"ci is green\"\n"
             "  git log -1 | agentbus send pi-notes -  read the message from stdin\n"
+            "  agentbus install                       configure every agent found here\n"
             "  agentbus doctor                        check this machine is wired up\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -220,6 +283,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doc = with_common(sub.add_parser("doctor", help="check this machine is wired up"))
     p_doc.set_defaults(func=cmd_doctor)
+
+    for verb, func, helptext in (
+        ("install", cmd_install, "configure agents on this machine to use the bus"),
+        ("uninstall", cmd_uninstall, "remove the agentbus configuration from agents"),
+    ):
+        sp = with_common(sub.add_parser(verb, help=helptext))
+        sp.add_argument("clients", nargs="*", metavar="client",
+                        help="clients to act on (default: every one found here)")
+        sp.add_argument("-n", "--dry-run", action="store_true", help="say what would change, write nothing")
+        sp.set_defaults(func=func)
 
     p_mcp = sub.add_parser("mcp", help="run the MCP adapter on stdio (hosts spawn this)")
     p_mcp.add_argument("--name", help="session name to register (default: from AGENTBUS_NAME or the directory)")

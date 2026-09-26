@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 
 # mkdown artifacts (auto-managed)
+docs/protocol.html
+README.html
 docs/roadmap.html
 build/
 dist/

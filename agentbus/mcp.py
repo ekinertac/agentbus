@@ -23,8 +23,10 @@ Related: protocol.py (wire), spool.py (inbox), cli.py (`agentbus mcp` and `agent
 """
 from __future__ import annotations
 
+import atexit
 import json
 import os
+import signal
 import socket as socket_mod
 import sys
 import threading
@@ -40,6 +42,8 @@ HOST_PREFIXES = {
     "q dev cli": "ki-",
     "kiro-cli": "ki-",
     "kiro": "ki-",
+    # Verified against codex-cli 0.155.1: it reports "codex-mcp-client", not "codex" or "codex-cli".
+    "codex-mcp-client": "cx-",
     "codex": "cx-",
     "codex-cli": "cx-",
     "gemini-cli": "gm-",
@@ -263,6 +267,20 @@ def serve(name_override: Optional[str] = None, stdin=None, stdout=None) -> int:
     server = Server(name_override)
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
+
+    # A host that ends the session by killing this process rather than closing stdin (codex does,
+    # confirmed: its registry files were still there after the process was gone) never reaches the
+    # `finally` below, so the socket, key and registry entry are left behind forever. leave() is
+    # idempotent, so both paths firing is harmless.
+    atexit.register(server.leave)
+
+    def on_signal(signum: int, _frame) -> None:
+        server.leave()
+        os._exit(0)  # a signal handler must not rely on unwinding back into the stdin loop
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, on_signal)
+
     try:
         for line in stdin:
             if not line.strip():

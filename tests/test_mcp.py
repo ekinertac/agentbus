@@ -140,6 +140,31 @@ class TestBusMembership(unittest.TestCase):
         host.initialize("Q DEV CLI")
         self.assertTrue(host.wait_for_registry()["name"].startswith("ki-"))
 
+    def test_codex_is_recognised_by_the_name_it_actually_reports(self):
+        # codex-cli 0.155.1 sends "codex-mcp-client" in clientInfo, not "codex" or "codex-cli".
+        host = Host()
+        self.addCleanup(host.close)
+        host.initialize("codex-mcp-client")
+        self.assertTrue(host.wait_for_registry()["name"].startswith("cx-"))
+
+    def test_cleans_up_when_killed_rather_than_closed(self):
+        # codex ends an MCP subprocess with a signal rather than closing stdin (confirmed against
+        # 0.155.1: a live session's registry entry and key were still there after the process was
+        # gone), which skips the `finally` around the stdin loop entirely.
+        import signal
+
+        host = Host()
+        host.initialize("codex-mcp-client")
+        entry = host.wait_for_registry()
+        os.kill(host.proc.pid, signal.SIGTERM)
+        host.proc.wait(timeout=10)
+        deadline = time.time() + 5
+        while time.time() < deadline and p.registry_path(host.proc.pid).exists():
+            time.sleep(0.05)
+        self.assertFalse(p.registry_path(host.proc.pid).exists())
+        self.assertFalse(p.key_path(host.proc.pid, entry["messagingSocketPath"]).exists())
+        self.assertFalse(Path(entry["messagingSocketPath"]).exists())
+
     def test_an_unknown_host_still_joins_under_the_generic_prefix(self):
         host = Host()
         self.addCleanup(host.close)

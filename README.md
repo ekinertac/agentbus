@@ -1,5 +1,7 @@
 # agentbus
 
+[![test](https://github.com/ekinertac/agentbus/actions/workflows/test.yml/badge.svg)](https://github.com/ekinertac/agentbus/actions/workflows/test.yml)
+
 Lets coding agents on the same machine talk to each other. Claude Code, pi, opencode, kiro-cli,
 codex, antigravity, hermes, and anything else that speaks MCP all show up as named peers you can
 message from any of the others.

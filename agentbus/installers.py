@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -32,18 +33,36 @@ SERVER_KEY = "agentbus"
 TOML_MARKER = "# agentbus: cross-session messaging (managed block, safe to delete)"
 
 
+def _importable_without_pythonpath() -> bool:
+    """
+    True when a bare subprocess of THIS interpreter can `import agentbus` on its own -- a real
+    `pip install` (editable or not) puts the package on that interpreter's default path, so
+    nothing extra is needed. False means we are running straight from a checkout with no install
+    step, which is also a fully supported way to use this, just one a spawned host process cannot
+    find on its own since it does not inherit our sys.path.
+
+    The probe runs with cwd forced OUTSIDE this checkout: Python puts a `-c` script's current
+    directory on sys.path[0], so running the probe from inside the checkout (its default cwd)
+    always "succeeds" whether or not the package is actually installed -- caught by testing this
+    from the repo root, where it silently gave a false positive.
+    """
+    probe = subprocess.run(
+        [sys.executable, "-c", "import agentbus"],
+        capture_output=True, timeout=10, cwd=tempfile.gettempdir(),
+    )
+    return probe.returncode == 0
+
+
 def server_command() -> Dict:
     """
-    How a host should spawn the adapter. Running from a checkout means the package is not on the
-    host's import path, so the entry carries PYTHONPATH; an installed console script would not
-    need it, and that is what a packaged release will emit instead.
+    How a host should spawn the adapter. PYTHONPATH is added only when this interpreter cannot
+    already `import agentbus` unaided (see _importable_without_pythonpath): an installed package
+    needs nothing extra, a bare checkout needs to be pointed at.
     """
-    repo = Path(__file__).resolve().parent.parent
-    return {
-        "command": sys.executable,
-        "args": ["-m", "agentbus", "mcp"],
-        "env": {"PYTHONPATH": str(repo)},
-    }
+    env: Dict[str, str] = {}
+    if not _importable_without_pythonpath():
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent)
+    return {"command": sys.executable, "args": ["-m", "agentbus", "mcp"], "env": env}
 
 
 def backup(path: Path) -> Optional[Path]:

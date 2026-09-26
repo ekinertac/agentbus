@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -251,3 +253,35 @@ class TestAntigravity(InstallerCase):
         # Each still reports itself correctly, unaffected by the other having run first.
         self.assertTrue(gemini.installed())
         self.assertTrue(antigravity.installed())
+
+
+class TestServerCommand(unittest.TestCase):
+    """
+    server_command() decides whether a spawned host needs PYTHONPATH to find this package. Both
+    branches get a real subprocess check, not a mock: a mock of _importable_without_pythonpath
+    would not have caught the actual bug found here (the probe subprocess inheriting this
+    checkout's own directory as its cwd, which puts the package on sys.path by accident of
+    Python's `-c` behavior, regardless of whether it is really installed).
+    """
+
+    def test_running_from_this_checkout_still_needs_pythonpath(self):
+        # This is the exact case that silently broke: running the probe from inside the repo
+        # (its default cwd) made every checkout look "installed", so this pins the fix by
+        # asserting PYTHONPATH is present in the one place it must be to reproduce that bug.
+        spec = installers.server_command()
+        self.assertIn("PYTHONPATH", spec["env"])
+        self.assertEqual(spec["env"]["PYTHONPATH"], str(Path(installers.__file__).resolve().parent.parent))
+
+    def test_a_real_install_needs_no_pythonpath(self):
+        # A cheap proxy for "genuinely installed": ask a bare subprocess started somewhere with
+        # no agentbus checkout nearby whether IT can import agentbus. If the current interpreter
+        # has agentbus on its default path (this repo installed with `pip install -e .`, or a
+        # real release build), the same must be true for a host-spawned one, and the command
+        # server_command() builds must carry no PYTHONPATH.
+        probe = subprocess.run(
+            [sys.executable, "-c", "import agentbus"],
+            capture_output=True, cwd=tempfile.gettempdir(),
+        )
+        if probe.returncode != 0:
+            self.skipTest("agentbus is not installed on this interpreter (only running from a checkout)")
+        self.assertEqual(installers.server_command()["env"], {})

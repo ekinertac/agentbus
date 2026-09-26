@@ -1,0 +1,35 @@
+[project]
+name = "agentbus-cli"
+version = "0.1.0"
+description = "Cross-session messaging between coding agents on the same machine (Claude Code, pi, opencode, kiro, codex, antigravity, hermes, and any MCP host)."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Ekin Ertaç" }]
+keywords = ["agents", "mcp", "claude-code", "cli", "cross-session"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development",
+]
+# Zero runtime dependencies on purpose: this has to run on whatever python a host already has,
+# not one a user installs just for this. See README for why (also true of the TS adapters, which
+# borrow the host's own runtime instead of shipping one).
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/ekinertac/agentbus"
+Issues = "https://github.com/ekinertac/agentbus/issues"
+
+[project.scripts]
+agentbus = "agentbus.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["agentbus*"]

@@ -132,6 +132,14 @@ class TestBusMembership(unittest.TestCase):
             time.sleep(0.05)
         self.assertFalse(p.registry_path(host.proc.pid).exists())
 
+    def test_kiro_is_recognised_by_the_name_it_actually_reports(self):
+        # Kiro sends "Q DEV CLI" in clientInfo, not "kiro-cli"; matching on the obvious name alone
+        # silently gave every kiro session the generic prefix.
+        host = Host()
+        self.addCleanup(host.close)
+        host.initialize("Q DEV CLI")
+        self.assertTrue(host.wait_for_registry()["name"].startswith("ki-"))
+
     def test_an_unknown_host_still_joins_under_the_generic_prefix(self):
         host = Host()
         self.addCleanup(host.close)

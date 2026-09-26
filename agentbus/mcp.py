@@ -36,6 +36,8 @@ from . import spool
 # Host name reported in MCP initialize -> the prefix its sessions are addressed by. An unknown
 # host still works, it just lands under the generic "ab-".
 HOST_PREFIXES = {
+    # Kiro reports its Amazon Q heritage rather than its own name, verified against 2.24.1.
+    "q dev cli": "ki-",
     "kiro-cli": "ki-",
     "kiro": "ki-",
     "codex": "cx-",

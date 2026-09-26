@@ -149,8 +149,6 @@ export function resolveTarget(to: string, selfPid: number): { sock: string; name
   return { error: `"${t}" matches ${pre.length} sessions: ${pre.map((r) => `${displayName(r)} [${r.pid}]`).join(", ")}. Use the full name.` };
 }
 
-export type PeerMode = "bypass" | "prompting";
-
 /**
  * Claude enforces permission-mode PARITY on inbound peer messages: a claim that does not match the
  * receiver's own class is parked as "held" until its user approves it, and so is a message with no

@@ -24,8 +24,11 @@ class InstallerCase(unittest.TestCase):
 
     def clients(self):
         # Claude installs nothing by design; pi has its own case below because it is the only
-        # client whose targets depend on directories existing first.
-        return [c for c in installers.all_clients(self.home) if c.name not in ("claude", "pi")]
+        # client whose targets depend on directories existing first; hermes has its own because
+        # it is the only client whose install()/uninstall() shells out to the real binary rather
+        # than just writing a file, so it needs "hermes actually installed here" as a precondition
+        # a throwaway HOME can't provide on a machine (or CI runner) that doesn't have it.
+        return [c for c in installers.all_clients(self.home) if c.name not in ("claude", "pi", "hermes")]
 
 
 class TestInstall(InstallerCase):
@@ -285,3 +288,41 @@ class TestServerCommand(unittest.TestCase):
         if probe.returncode != 0:
             self.skipTest("agentbus is not installed on this interpreter (only running from a checkout)")
         self.assertEqual(installers.server_command()["env"], {})
+
+
+class TestHermes(InstallerCase):
+    """
+    hermes mcp add/list/remove is a real subprocess call, unlike every other client's plain file
+    write, so these need the real binary present -- skipped, not failed, when it isn't (any CI
+    runner, any machine that has never installed Hermes Agent).
+    """
+
+    def setUp(self):
+        super().setUp()
+        import shutil
+
+        if shutil.which("hermes") is None:
+            self.skipTest("hermes is not installed on this machine")
+        self.hermes = installers.by_name("hermes", self.home)
+
+    def test_install_then_uninstall_leaves_no_trace(self):
+        first = self.hermes.install()
+        self.assertTrue(first.changed)
+        self.assertTrue(self.hermes.installed())
+        removed = self.hermes.uninstall()
+        self.assertTrue(removed.changed)
+        self.assertFalse(self.hermes.installed())
+
+    def test_installing_twice_changes_nothing_the_second_time(self):
+        self.hermes.install()
+        second = self.hermes.install()
+        self.assertFalse(second.changed)
+
+    def test_dry_run_writes_nothing(self):
+        result = self.hermes.install(dry_run=True)
+        self.assertTrue(result.changed)
+        self.assertFalse(self.hermes.installed())
+
+    def test_uninstalling_something_never_installed_is_not_an_error(self):
+        result = self.hermes.uninstall()
+        self.assertFalse(result.changed)

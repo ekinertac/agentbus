@@ -35,7 +35,11 @@ jobs:
           python-version: "3.13"
       - run: pip install -e .
       - run: agentbus --help
-      - run: agentbus doctor --json
+      # exit 4 here is doctor correctly reporting "not wired up" -- there is no ~/.claude on a
+      # bare CI runner, that's expected, not a failure. Only the JSON shape is being smoke-tested,
+      # so the doctor call's own exit code is deliberately not checked.
+      - run: agentbus doctor --json > doctor.json || true
+      - run: python3 -c "import json; json.load(open('doctor.json'))"
 
   typescript:
     strategy:

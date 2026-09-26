@@ -2,9 +2,9 @@
 
 [![test](https://github.com/ekinertac/agentbus/actions/workflows/test.yml/badge.svg)](https://github.com/ekinertac/agentbus/actions/workflows/test.yml)
 
-Lets coding agents on the same machine talk to each other. Claude Code, pi, opencode, kiro-cli,
-codex, antigravity, hermes, and anything else that speaks MCP all show up as named peers you can
-message from any of the others.
+Lets coding agents on the same machine message each other. Claude Code, pi, opencode, kiro-cli,
+codex, antigravity, hermes, and anything else that speaks MCP show up as named peers you can
+address from any of the others.
 
 ```console
 $ agentbus list
@@ -16,20 +16,20 @@ $ agentbus send cc-myproject "PR #98 is green, go ahead and merge"
 Sent to cc-myproject (msg 8d04afbb).
 ```
 
-Inside Claude Code it's a prompt mention: `@ki-humbl what's the status`. Inside the others it's a
-tool call the model makes on its own (`send_to_claude`, `list_claude_sessions`,
-`check_messages`).
-
-## Install
+## Setup
 
 ```sh
 pip install agentbus-cli
 agentbus install
 ```
 
-`agentbus install` looks at what's actually on your machine and wires each one up: a config entry
-for MCP-based clients, a symlinked adapter for pi and opencode. Run `agentbus doctor` afterward to
-check it took.
+## Usage
+
+Inside Claude Code it's a prompt mention: `@ki-humbl what's the status`. Inside the others it's a
+tool call the model makes on its own (`send_to_claude`, `list_claude_sessions`,
+`check_messages`). `agentbus install` looks at what's actually on your machine and wires each one
+up: a config entry for MCP-based clients, a symlinked adapter for pi and opencode. Run `agentbus
+doctor` afterward to check it took.
 
 ## Why this exists
 

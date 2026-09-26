@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .venv/
+
+# mkdown artifacts (auto-managed)
+docs/roadmap.html

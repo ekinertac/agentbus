@@ -5,7 +5,7 @@ detection), ~80 identifiers as of 2026-09. Cross-referenced against GitHub for r
 repos and star counts on 2026-09-26. Numbers are a proxy for "worth building next", not a
 guarantee of MCP support; each still needs its own config-format check before adding.
 
-## Shipped and verified (6)
+## Shipped and verified (7)
 
 | client | prefix | delivery | status |
 |---|---|---|---|
@@ -15,6 +15,7 @@ guarantee of MCP support; each still needs its own config-format check before ad
 | kiro-cli | `ki-` | spooled, model pulls | done (kirodotdev/Kiro#11614, #11620 filed against its hook engine) |
 | codex | `cx-` | spooled | done |
 | antigravity-cli | `ag-` | spooled | done |
+| hermes (NousResearch) | `ab-` (generic — reports itself as `"mcp"`, too generic to map safely) | spooled | done; 249,116★ (NousResearch/hermes-agent), by far the largest repo in this whole list, found by checking what was already installed locally rather than the ranked table below |
 
 ## Deprioritized / blocked
 

@@ -178,6 +178,19 @@ class TestBusMembership(unittest.TestCase):
         host.initialize("some-editor-nobody-mapped")
         self.assertTrue(host.wait_for_registry()["name"].startswith("ab-"))
 
+    def test_hermes_reports_mcp_and_is_deliberately_left_unmapped(self):
+        # Hermes Agent 0.21.0 sends "mcp" in clientInfo, which is too generic to map without
+        # risking misattributing some other, unrelated host that also calls itself "mcp". The
+        # generic prefix is the correct outcome here, not a gap: this pins that decision so a
+        # future edit adding "mcp" -> "hm-" to HOST_PREFIXES fails loudly instead of quietly.
+        from agentbus.mcp import HOST_PREFIXES
+
+        self.assertNotIn("mcp", HOST_PREFIXES)
+        host = Host()
+        self.addCleanup(host.close)
+        host.initialize("mcp")
+        self.assertTrue(host.wait_for_registry()["name"].startswith("ab-"))
+
     def test_agentbus_name_overrides_the_directory(self):
         host = Host(env_extra={"AGENTBUS_NAME": "chat v1!"})
         self.addCleanup(host.close)

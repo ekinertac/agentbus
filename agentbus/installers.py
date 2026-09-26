@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -496,6 +497,77 @@ class Opencode(Client):
         return Result(self.name, True, f"removed the plugin entry and {self.shim_path}", saved)
 
 
+class Hermes(Client):
+    """
+    Hermes Agent (NousResearch) keeps its config in ~/.hermes/config.yaml, a big hand-maintained
+    file with real comments and sections. The stdlib has no YAML writer, and even a careful
+    block-append is unsafe here: `mcp_servers:` is a top-level key that (unlike TOML's
+    `[mcp_servers.x]` tables) most YAML parsers resolve by taking the LAST occurrence, so
+    appending a second `mcp_servers:` block would silently wipe out any servers already there
+    instead of adding to them.
+
+    So this drives `hermes mcp add/list/remove` directly rather than touching the file: it is the
+    one component that actually understands that format safely, and it is a stable, documented CLI.
+    Every prompt gets an explicit "y" (closed stdin does not reliably default-accept, confirmed:
+    the "enable all tools?" prompt cancels on EOF despite defaulting to Y) and `installed()` reads
+    back through `mcp list` rather than the file, for the same reason.
+
+    Hermes reports itself to MCP as literally "mcp" (confirmed against 0.21.0) - too generic to
+    map to a prefix without risking misattributing some other, unrelated host that also lazily
+    calls itself "mcp". It is deliberately left out of mcp.HOST_PREFIXES; its sessions register
+    under the generic "ab-" prefix like any other unrecognised host, which is correct here, not a
+    gap to close.
+    """
+
+    name = "hermes"
+    label = "Hermes Agent"
+
+    def present(self) -> bool:
+        return shutil.which("hermes") is not None or (self.home / ".hermes").exists()
+
+    def _run(self, args: List[str], input_text: str = "") -> "subprocess.CompletedProcess":
+        env = dict(os.environ)
+        env["HOME"] = str(self.home)
+        return subprocess.run(
+            ["hermes", *args], input=input_text, capture_output=True, text=True,
+            timeout=30, env=env,
+        )
+
+    def installed(self) -> bool:
+        out = self._run(["mcp", "list"]).stdout
+        # The table has a Status column; "enabled" only appears there, never in the name/path
+        # columns for a server named "agentbus" (SERVER_KEY has no dash-adjacent "enabled" text).
+        return SERVER_KEY in out and "enabled" in out
+
+    def install(self, dry_run: bool = False) -> Result:
+        if self.installed():
+            return Result(self.name, False, "already configured (`hermes mcp list`)")
+        if dry_run:
+            return Result(self.name, True, "would run `hermes mcp add agentbus ...`")
+        spec = server_command()
+        args = [
+            "mcp", "add", SERVER_KEY, "--command", spec["command"],
+            "--env", *[f"{k}={v}" for k, v in spec["env"].items()],
+            "--args", *spec["args"],
+        ]
+        # Two prompts possible (overwrite an existing entry, then enable its tools); an unneeded
+        # extra "y" is simply left unread when the process exits after the first.
+        result = self._run(args, input_text="y\ny\n")
+        if "Saved" not in result.stdout:
+            raise OSError(f"hermes mcp add did not report success: {result.stdout}{result.stderr}")
+        return Result(self.name, True, "added via `hermes mcp add`, config at ~/.hermes/config.yaml")
+
+    def uninstall(self, dry_run: bool = False) -> Result:
+        if not self.installed():
+            return Result(self.name, False, "nothing to remove")
+        if dry_run:
+            return Result(self.name, True, "would run `hermes mcp remove agentbus`")
+        result = self._run(["mcp", "remove", SERVER_KEY], input_text="y\n")
+        if "Removed" not in result.stdout:
+            raise OSError(f"hermes mcp remove did not report success: {result.stdout}{result.stderr}")
+        return Result(self.name, True, "removed via `hermes mcp remove`")
+
+
 class ClaudeCode(Client):
     """Claude Code owns the protocol; it needs nothing installed to see other agents."""
 
@@ -515,7 +587,7 @@ class ClaudeCode(Client):
         return Result(self.name, False, "nothing to remove")
 
 
-CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor, Antigravity]
+CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor, Antigravity, Hermes]
 def all_clients(home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> List[Client]:
     return [
         cls(home, extra_dirs) if cls is Pi else cls(home)  # type: ignore[call-arg]

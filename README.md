@@ -8,12 +8,12 @@ address from any of the others.
 
 ```console
 $ agentbus list
-cc-myproject   claude   idle    ~/Code/myproject
-ki-humbl       kiro     idle    ~/Code/humbl-streaming
-pi-hue         pi       idle    ~/Code/philips-hue-cli
+cc-acme-frontend   claude   idle    ~/Code/acme-frontend
+ki-acme-backend    kiro     idle    ~/Code/acme-backend
+pi-acme-security   pi       idle    ~/Code/acme-security
 
-$ agentbus send cc-myproject "PR #98 is green, go ahead and merge"
-Sent to cc-myproject (msg 8d04afbb).
+$ agentbus send cc-acme-frontend "PR #98 is green, go ahead and merge"
+Sent to cc-acme-frontend (msg 8d04afbb).
 ```
 
 ## Setup
@@ -25,7 +25,7 @@ agentbus install
 
 ## Usage
 
-Inside Claude Code it's a prompt mention: `@ki-humbl what's the status`. Inside the others it's a
+Inside Claude Code it's a prompt mention: `@ki-acme-backend what's the status`. Inside the others it's a
 tool call the model makes on its own (`send_to_claude`, `list_claude_sessions`,
 `check_messages`). `agentbus install` looks at what's actually on your machine and wires each one
 up: a config entry for MCP-based clients, a symlinked adapter for pi and opencode. Run `agentbus

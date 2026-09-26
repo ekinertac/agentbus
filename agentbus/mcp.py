@@ -50,6 +50,9 @@ HOST_PREFIXES = {
     "gemini": "gm-",
     "cursor": "cu-",
     "cursor-cli": "cu-",
+    # Verified against antigravity-cli 1.2.11: it reports "antigravity-client".
+    "antigravity-client": "ag-",
+    "antigravity": "ag-",
 }
 DEFAULT_PREFIX = "ab-"
 PROTOCOL_VERSION = "2025-06-18"

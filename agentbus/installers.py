@@ -222,6 +222,24 @@ class Cursor(JsonMcpClient):
     config_relpath = ".cursor/mcp.json"
 
 
+class Antigravity(JsonMcpClient):
+    """
+    Confirmed by watching `agy mcp add` write to a throwaway HOME: despite the `agy`/`antigravity`
+    binary name, its MCP config lives under `.gemini/config/mcp_config.json` (Antigravity shares
+    its agent core with Gemini CLI), a different file from Gemini CLI's own `.gemini/settings.json`
+    so the two installers cannot collide. `agy mcp add/list/remove` is the documented way to manage
+    it, but a plain JSON write is simpler and this shape matches what `agy mcp add` itself produces.
+    """
+
+    name = "antigravity"
+    label = "Antigravity CLI"
+    config_relpath = ".gemini/config/mcp_config.json"
+    extra_server_fields = {"disabled": False}
+
+    def present(self) -> bool:
+        return shutil.which("agy") is not None or shutil.which("antigravity") is not None
+
+
 class Codex(Client):
     """Codex keeps its config in TOML, which the stdlib cannot write, so the block is managed by text."""
 
@@ -497,7 +515,7 @@ class ClaudeCode(Client):
         return Result(self.name, False, "nothing to remove")
 
 
-CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor]
+CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor, Antigravity]
 def all_clients(home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> List[Client]:
     return [
         cls(home, extra_dirs) if cls is Pi else cls(home)  # type: ignore[call-arg]

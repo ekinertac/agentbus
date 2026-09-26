@@ -226,3 +226,28 @@ class TestOpencode(InstallerCase):
         oc.shim_path.unlink()
         self.assertFalse(oc.installed())
         self.assertTrue(oc.install().changed)
+
+
+class TestAntigravity(InstallerCase):
+    def test_writes_its_own_file_under_gemini_matching_what_agy_mcp_add_produces(self):
+        # Confirmed against a real `agy mcp add` on a throwaway HOME: despite the binary name, its
+        # config lands at .gemini/config/mcp_config.json, with "disabled": false on each server.
+        ag = installers.by_name("antigravity", self.home)
+        ag.install()
+        self.assertEqual(ag.config_path, self.home / ".gemini/config/mcp_config.json")
+        config = json.loads(ag.config_path.read_text())
+        self.assertFalse(config["mcpServers"]["agentbus"]["disabled"])
+
+    def test_does_not_collide_with_gemini_cli_sharing_the_gemini_directory(self):
+        # Gemini CLI's own config is .gemini/settings.json, a different file under the same parent
+        # directory; installing one must not create or touch the other's file.
+        gemini = installers.by_name("gemini", self.home)
+        antigravity = installers.by_name("antigravity", self.home)
+        antigravity.install()
+        self.assertFalse(gemini.config_path.exists())
+        gemini.install()
+        self.assertTrue(gemini.config_path.exists())
+        self.assertNotEqual(gemini.config_path, antigravity.config_path)
+        # Each still reports itself correctly, unaffected by the other having run first.
+        self.assertTrue(gemini.installed())
+        self.assertTrue(antigravity.installed())

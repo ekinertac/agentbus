@@ -147,6 +147,13 @@ class TestBusMembership(unittest.TestCase):
         host.initialize("codex-mcp-client")
         self.assertTrue(host.wait_for_registry()["name"].startswith("cx-"))
 
+    def test_antigravity_is_recognised_by_the_name_it_actually_reports(self):
+        # antigravity-cli 1.2.11 sends "antigravity-client" in clientInfo.
+        host = Host()
+        self.addCleanup(host.close)
+        host.initialize("antigravity-client")
+        self.assertTrue(host.wait_for_registry()["name"].startswith("ag-"))
+
     def test_cleans_up_when_killed_rather_than_closed(self):
         # codex ends an MCP subprocess with a signal rather than closing stdin (confirmed against
         # 0.155.1: a live session's registry entry and key were still there after the process was

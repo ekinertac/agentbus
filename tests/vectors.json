@@ -140,6 +140,14 @@
         "entrypoint": "kiro"
       },
       "expect": "ki-hue"
+    },
+    {
+      "why": "a session served by the MCP adapter carries its prefix too",
+      "entry": {
+        "name": "ki-hue",
+        "entrypoint": "agentbus"
+      },
+      "expect": "ki-hue"
     }
   ],
   "pid_of_socket": [

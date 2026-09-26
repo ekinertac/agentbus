@@ -301,6 +301,93 @@ class Codex(Client):
         return Result(self.name, True, f"removed the agentbus block from {self.config_path}", saved)
 
 
+def _pi_extensions_dir(base: Path) -> Path:
+    """
+    Where extensions live under a pi agent directory. The standard layout nests them under agent/
+    (~/.pi/agent/extensions); a wrapper pointing PI_CODING_AGENT_DIR at its own directory keeps
+    them at the top level. Whichever exists wins, and a fresh directory gets the flat form.
+    """
+    if (base / "extensions").is_dir():
+        return base / "extensions"
+    if (base / "agent" / "extensions").is_dir() or (base / "agent").is_dir():
+        return base / "agent" / "extensions"
+    return base / "extensions"
+
+
+class Pi(Client):
+    """
+    pi loads any directory under <agent dir>/extensions, so the adapter is symlinked in rather
+    than copied: a git pull then updates every install at once.
+
+    The agent dir is PI_CODING_AGENT_DIR when set, else ~/.pi/agent. Wrappers point that variable
+    at a directory of their own and keep extensions at its top level rather than under agent/, so
+    extra locations are passed in with --agent-dir instead of being guessed at.
+    """
+
+    name = "pi"
+    label = "pi"
+
+    def __init__(self, home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None):
+        super().__init__(home)
+        self.extra_dirs = list(extra_dirs or [])
+
+    @property
+    def adapter_source(self) -> Path:
+        return Path(__file__).resolve().parent.parent / "adapters" / "pi"
+
+    def extension_dirs(self) -> List[Path]:
+        """Every extensions directory this install should land in, deduplicated, in order."""
+        dirs: List[Path] = []
+        env_dir = os.environ.get("PI_CODING_AGENT_DIR")
+        if env_dir:
+            dirs.append(Path(env_dir).expanduser())
+        dirs.append(self.home / ".pi" / "agent")
+        dirs.extend(self.extra_dirs)
+        out: List[Path] = []
+        for base in dirs:
+            target = _pi_extensions_dir(base.expanduser())
+            if target not in out:
+                out.append(target)
+        return out
+
+    def present(self) -> bool:
+        return (self.home / ".pi").exists() or shutil.which("pi") is not None or bool(self.extra_dirs)
+
+    def _links(self) -> List[Path]:
+        return [d / SERVER_KEY for d in self.extension_dirs()]
+
+    def installed(self) -> bool:
+        links = self._links()
+        return bool(links) and all(
+            link.is_symlink() and link.resolve() == self.adapter_source for link in links
+        )
+
+    def install(self, dry_run: bool = False) -> Result:
+        todo = [link for link in self._links()
+                if not (link.is_symlink() and link.resolve() == self.adapter_source)]
+        if not todo:
+            return Result(self.name, False, f"already linked into {len(self._links())} extensions directory(ies)")
+        if dry_run:
+            return Result(self.name, True, "would link the adapter into " + ", ".join(str(t) for t in todo))
+        for link in todo:
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if link.exists() or link.is_symlink():
+                link.unlink()
+            link.symlink_to(self.adapter_source, target_is_directory=True)
+        return Result(self.name, True,
+                      "linked the adapter into " + ", ".join(str(t) for t in todo) + ". Run /reload in pi.")
+
+    def uninstall(self, dry_run: bool = False) -> Result:
+        present = [link for link in self._links() if link.is_symlink() or link.exists()]
+        if not present:
+            return Result(self.name, False, "nothing to remove")
+        if dry_run:
+            return Result(self.name, True, "would remove " + ", ".join(str(link) for link in present))
+        for link in present:
+            link.unlink()
+        return Result(self.name, True, "removed " + ", ".join(str(link) for link in present))
+
+
 class ClaudeCode(Client):
     """Claude Code owns the protocol; it needs nothing installed to see other agents."""
 
@@ -320,17 +407,20 @@ class ClaudeCode(Client):
         return Result(self.name, False, "nothing to remove")
 
 
-CLIENTS = [ClaudeCode, Kiro, Codex, Gemini, Cursor]
-# Hosts with a plugin API that can push into a live turn. Their adapters are not in this repo yet.
-PLUGIN_HOSTS = {"pi": "pi", "opencode": "opencode"}
+CLIENTS = [ClaudeCode, Pi, Kiro, Codex, Gemini, Cursor]
+# Hosts with a plugin API whose adapter is not in this repo yet.
+PLUGIN_HOSTS = {"opencode": "opencode"}
 
 
-def all_clients(home: Optional[Path] = None) -> List[Client]:
-    return [cls(home) for cls in CLIENTS]
+def all_clients(home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> List[Client]:
+    return [
+        cls(home, extra_dirs) if cls is Pi else cls(home)  # type: ignore[call-arg]
+        for cls in CLIENTS
+    ]
 
 
-def by_name(name: str, home: Optional[Path] = None) -> Optional[Client]:
-    for client in all_clients(home):
+def by_name(name: str, home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> Optional[Client]:
+    for client in all_clients(home, extra_dirs):
         if client.name == name:
             return client
     return None

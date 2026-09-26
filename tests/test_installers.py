@@ -8,6 +8,7 @@ this is safe to run on someone's machine, so both are checked for every client.
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,8 +21,9 @@ class InstallerCase(unittest.TestCase):
         self.home = Path(tempfile.mkdtemp(prefix="agentbus-home-"))
 
     def clients(self):
-        # Claude installs nothing by design, so it is not part of the write/undo contract.
-        return [c for c in installers.all_clients(self.home) if c.name != "claude"]
+        # Claude installs nothing by design; pi has its own case below because it is the only
+        # client whose targets depend on directories existing first.
+        return [c for c in installers.all_clients(self.home) if c.name not in ("claude", "pi")]
 
 
 class TestInstall(InstallerCase):
@@ -129,3 +131,64 @@ class TestKiroAgent(InstallerCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPi(InstallerCase):
+    """pi is the one client installed by symlink, and the one with more than one target directory."""
+
+    def setUp(self):
+        super().setUp()
+        # A wrapper's variable in the developer's own shell must not leak into these.
+        self._saved = os.environ.pop("PI_CODING_AGENT_DIR", None)
+
+    def tearDown(self):
+        if self._saved is not None:
+            os.environ["PI_CODING_AGENT_DIR"] = self._saved
+
+    def test_links_into_the_standard_agent_directory(self):
+        (self.home / ".pi/agent/extensions").mkdir(parents=True)
+        pi = installers.by_name("pi", self.home)
+        pi.install()
+        link = self.home / ".pi/agent/extensions/agentbus"
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(link.resolve(), pi.adapter_source)
+        self.assertTrue((link / "index.ts").exists())
+
+    def test_a_wrapper_directory_keeps_extensions_at_its_top_level(self):
+        wrapper = self.home / "wrapper"
+        (wrapper / "extensions").mkdir(parents=True)
+        (self.home / ".pi/agent/extensions").mkdir(parents=True)
+        pi = installers.by_name("pi", self.home, extra_dirs=[wrapper])
+        pi.install()
+        self.assertTrue((wrapper / "extensions/agentbus").is_symlink())
+        self.assertTrue((self.home / ".pi/agent/extensions/agentbus").is_symlink())
+
+    def test_pi_coding_agent_dir_from_the_environment_is_included(self):
+        wrapper = self.home / "envwrapper"
+        (wrapper / "extensions").mkdir(parents=True)
+        os.environ["PI_CODING_AGENT_DIR"] = str(wrapper)
+        try:
+            installers.by_name("pi", self.home).install()
+        finally:
+            del os.environ["PI_CODING_AGENT_DIR"]
+        self.assertTrue((wrapper / "extensions/agentbus").is_symlink())
+
+    def test_installing_twice_changes_nothing_and_uninstall_removes_every_link(self):
+        wrapper = self.home / "wrapper"
+        (wrapper / "extensions").mkdir(parents=True)
+        pi = installers.by_name("pi", self.home, extra_dirs=[wrapper])
+        pi.install()
+        self.assertFalse(pi.install().changed)
+        self.assertTrue(pi.installed())
+        pi.uninstall()
+        self.assertFalse(pi.installed())
+        self.assertFalse((wrapper / "extensions/agentbus").exists())
+
+    def test_a_stale_link_is_replaced_rather_than_left_pointing_elsewhere(self):
+        ext = self.home / ".pi/agent/extensions"
+        ext.mkdir(parents=True)
+        (ext / "agentbus").symlink_to(self.home)  # e.g. a link from an older checkout
+        pi = installers.by_name("pi", self.home)
+        self.assertFalse(pi.installed())
+        pi.install()
+        self.assertEqual((ext / "agentbus").resolve(), pi.adapter_source)

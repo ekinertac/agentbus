@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 from . import installers
@@ -196,13 +197,14 @@ def cmd_drain(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _selected_clients(names: List[str]) -> List:
+def _selected_clients(names: List[str], agent_dirs: Optional[List[str]] = None) -> List:
     """No names means every client this machine actually has."""
+    extra = [Path(d) for d in (agent_dirs or [])]
     if not names:
-        return [c for c in installers.all_clients() if c.present()]
+        return [c for c in installers.all_clients(extra_dirs=extra) if c.present()]
     chosen = []
     for name in names:
-        client = installers.by_name(name)
+        client = installers.by_name(name, extra_dirs=extra)
         if client is None:
             hint = installers.PLUGIN_HOSTS.get(name)
             if hint:
@@ -216,7 +218,7 @@ def _selected_clients(names: List[str]) -> List:
 
 
 def _run_install(args: argparse.Namespace, uninstall: bool) -> int:
-    clients = _selected_clients(args.clients)
+    clients = _selected_clients(args.clients, getattr(args, "agent_dir", None))
     if not clients:
         if args.clients:
             return EXIT_USAGE
@@ -292,6 +294,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("clients", nargs="*", metavar="client",
                         help="clients to act on (default: every one found here)")
         sp.add_argument("-n", "--dry-run", action="store_true", help="say what would change, write nothing")
+        sp.add_argument("--agent-dir", action="append", metavar="DIR",
+                        help="extra pi agent directory (a wrapper's PI_CODING_AGENT_DIR); repeatable")
         sp.set_defaults(func=func)
 
     p_mcp = sub.add_parser("mcp", help="run the MCP adapter on stdio (hosts spawn this)")

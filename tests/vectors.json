@@ -1,0 +1,196 @@
+{
+  "_comment": "Shared cases for every agentbus implementation. Python (tests/test_protocol.py) and TypeScript (adapters/*/core.test.ts) both read this file, so a change in one language that drifts from the other fails the other's suite.",
+  "build_envelope": [
+    {
+      "why": "the shape Claude's parser matches, attribute order included",
+      "from": "uds:/tmp/cc-socks/1.sock",
+      "name": "pi-hue",
+      "body": "hello\nworld",
+      "mode": "bypass",
+      "wire": "<cross-session-message from=\"uds:/tmp/cc-socks/1.sock\" from-name=\"pi-hue\" from-mode=\"bypass\">\nhello\nworld\n</cross-session-message>"
+    },
+    {
+      "why": "mode is per-target, not a constant",
+      "from": "uds:/tmp/cc-socks/2.sock",
+      "name": "oc-x",
+      "body": "hi",
+      "mode": "prompting",
+      "wire": "<cross-session-message from=\"uds:/tmp/cc-socks/2.sock\" from-name=\"oc-x\" from-mode=\"prompting\">\nhi\n</cross-session-message>"
+    },
+    {
+      "why": "quotes and angle brackets in a name would break out of the tag",
+      "from": "uds:/x.sock",
+      "name": "a\"<b>",
+      "body": "x",
+      "mode": "bypass",
+      "wire": "<cross-session-message from=\"uds:/x.sock\" from-name=\"ab\" from-mode=\"bypass\">\nx\n</cross-session-message>"
+    }
+  ],
+  "parse_envelope": [
+    {
+      "why": "round trip of the common case",
+      "content": "<cross-session-message from=\"uds:/tmp/cc-socks/1.sock\" from-name=\"agent-messaging\" from-mode=\"bypass\">\nping\n</cross-session-message>",
+      "expect": {
+        "from": "uds:/tmp/cc-socks/1.sock",
+        "fromName": "agent-messaging",
+        "fromMode": "bypass",
+        "body": "ping"
+      }
+    },
+    {
+      "why": "a body containing the tag text must not end the match early",
+      "content": "<cross-session-message from=\"uds:/x.sock\" from-name=\"cc-a\" from-mode=\"bypass\">\nsee </cross-session-message> in text\n</cross-session-message>",
+      "expect": {
+        "from": "uds:/x.sock",
+        "fromName": "cc-a",
+        "fromMode": "bypass",
+        "body": "see </cross-session-message> in text"
+      }
+    },
+    {
+      "why": "plain text passes through untouched",
+      "content": "just text",
+      "expect": {
+        "body": "just text"
+      }
+    }
+  ],
+  "derive_name": [
+    {
+      "why": "cwd basename is the default",
+      "cwd": "/Users/x/Code/philips-hue-cli",
+      "sessionName": null,
+      "taken": [],
+      "prefix": "pi-",
+      "expect": "pi-philips-hue-cli"
+    },
+    {
+      "why": "a given name wins and is sanitised",
+      "cwd": "/tmp/a",
+      "sessionName": "Hue CLI work!",
+      "taken": [],
+      "prefix": "pi-",
+      "expect": "pi-Hue-CLI-work"
+    },
+    {
+      "why": "collisions get a numeric suffix",
+      "cwd": "/tmp/a",
+      "sessionName": null,
+      "taken": [
+        "pi-a",
+        "pi-a-2"
+      ],
+      "prefix": "pi-",
+      "expect": "pi-a-3"
+    },
+    {
+      "why": "each agent brings its own prefix",
+      "cwd": "/tmp/hue",
+      "sessionName": null,
+      "taken": [],
+      "prefix": "oc-",
+      "expect": "oc-hue"
+    },
+    {
+      "why": "trailing slash must not produce an empty basename",
+      "cwd": "/tmp/hue/",
+      "sessionName": null,
+      "taken": [],
+      "prefix": "ki-",
+      "expect": "ki-hue"
+    }
+  ],
+  "display_name": [
+    {
+      "why": "a Claude session is addressed cc-<name>",
+      "entry": {
+        "name": "agent-messaging",
+        "entrypoint": "cli"
+      },
+      "expect": "cc-agent-messaging"
+    },
+    {
+      "why": "an entry with no entrypoint is Claude too",
+      "entry": {
+        "name": "old",
+        "entrypoint": null
+      },
+      "expect": "cc-old"
+    },
+    {
+      "why": "our agents already carry a prefix",
+      "entry": {
+        "name": "pi-hue",
+        "entrypoint": "pi"
+      },
+      "expect": "pi-hue"
+    },
+    {
+      "why": "same for opencode",
+      "entry": {
+        "name": "oc-hue",
+        "entrypoint": "opencode"
+      },
+      "expect": "oc-hue"
+    },
+    {
+      "why": "same for kiro",
+      "entry": {
+        "name": "ki-hue",
+        "entrypoint": "kiro"
+      },
+      "expect": "ki-hue"
+    }
+  ],
+  "pid_of_socket": [
+    {
+      "sock": "/tmp/cc-socks/8456.sock",
+      "expect": 8456
+    },
+    {
+      "why": "claude also uses a pid-suffix form",
+      "sock": "/tmp/cc-socks/8456-1a2b3c4d.sock",
+      "expect": 8456
+    },
+    {
+      "sock": "/tmp/cc-socks/nope",
+      "expect": null
+    }
+  ],
+  "permission_mode_map": [
+    {
+      "why": "only bypassPermissions counts as the bypass class",
+      "transcript": "bypassPermissions",
+      "expect": "bypass"
+    },
+    {
+      "transcript": "default",
+      "expect": "prompting"
+    },
+    {
+      "transcript": "plan",
+      "expect": "prompting"
+    },
+    {
+      "transcript": "acceptEdits",
+      "expect": "prompting"
+    }
+  ],
+  "permission_mode_line": [
+    {
+      "why": "the compact form Claude actually writes",
+      "line": "{\"permissionMode\":\"bypassPermissions\"}",
+      "expect": "bypassPermissions"
+    },
+    {
+      "why": "whitespace after the colon must still match",
+      "line": "{\"permissionMode\": \"plan\"}",
+      "expect": "plan"
+    },
+    {
+      "why": "a line without the field yields nothing",
+      "line": "{\"type\":\"user\"}",
+      "expect": null
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import sys
 from typing import List, Optional
 
 from . import protocol as p
+from . import spool
 
 EXIT_OK = 0
 EXIT_FAIL = 1
@@ -159,6 +160,34 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT_NOT_WIRED if failed else EXIT_OK
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Run the MCP adapter on stdio. A host spawns this; a human never runs it directly."""
+    from . import mcp  # imported late so `agentbus list` does not pay for it
+
+    return mcp.serve(args.name)
+
+
+def cmd_drain(args: argparse.Namespace) -> int:
+    """
+    Print and clear messages waiting for the session in this directory, for hosts that run hooks.
+
+    Deliberately reads no stdin: a host that writes no hook payload and leaves the pipe open would
+    block this until its timeout killed it, which is indistinguishable from the hook never running.
+    Silent when there is nothing, so a hook adds nothing to the context on a quiet turn.
+    """
+    cwd = os.getcwd()
+    pids = [
+        e["pid"] for e in p.read_registry()
+        if e.get("entrypoint") == "agentbus" and e.get("cwd") == cwd
+    ]
+    messages = [m for pid in pids for m in spool.drain(pid)]
+    if args.json:
+        print(json.dumps(messages, indent=2))
+    elif messages:
+        print("\n\n".join(spool.render(m) for m in messages))
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agentbus",
@@ -191,6 +220,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doc = with_common(sub.add_parser("doctor", help="check this machine is wired up"))
     p_doc.set_defaults(func=cmd_doctor)
+
+    p_mcp = sub.add_parser("mcp", help="run the MCP adapter on stdio (hosts spawn this)")
+    p_mcp.add_argument("--name", help="session name to register (default: from AGENTBUS_NAME or the directory)")
+    p_mcp.set_defaults(func=cmd_mcp)
+
+    p_drain = with_common(sub.add_parser("drain", help="print and clear messages waiting for this directory's session"))
+    p_drain.set_defaults(func=cmd_drain)
 
     return parser
 

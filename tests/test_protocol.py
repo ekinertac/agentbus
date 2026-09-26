@@ -57,6 +57,14 @@ class TestVectors(unittest.TestCase):
                 self.assertEqual(p.pid_of_socket(case["sock"]), case["expect"])
 
 
+class TestReplyAddress(unittest.TestCase):
+    def test_vectors(self):
+        from agentbus import spool
+        for case in VECTORS["reply_address"]:
+            with self.subTest(case.get("why")):
+                self.assertEqual(spool.reply_address(case["fromName"], case["from"]), case["expect"])
+
+
 class TestProcStart(unittest.TestCase):
     def test_matches_the_format_claude_compares(self):
         # Claude string-compares this against its own reading, so the format is part of the protocol.

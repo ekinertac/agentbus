@@ -192,5 +192,31 @@
       "line": "{\"type\":\"user\"}",
       "expect": null
     }
+  ],
+  "reply_address": [
+    {
+      "why": "a Claude sender is addressed cc-<name>",
+      "fromName": "agent-messaging",
+      "from": "uds:/x.sock",
+      "expect": "cc-agent-messaging"
+    },
+    {
+      "why": "an agent name already carries its prefix",
+      "fromName": "pi-hue",
+      "from": "uds:/x.sock",
+      "expect": "pi-hue"
+    },
+    {
+      "why": "and is not double-prefixed when it is already cc-",
+      "fromName": "cc-tester",
+      "from": "uds:/x.sock",
+      "expect": "cc-tester"
+    },
+    {
+      "why": "with no name at all, the raw address is the only way back",
+      "fromName": null,
+      "from": "uds:/x.sock",
+      "expect": "uds:/x.sock"
+    }
   ]
 }

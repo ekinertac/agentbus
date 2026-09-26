@@ -206,12 +206,8 @@ def _selected_clients(names: List[str], agent_dirs: Optional[List[str]] = None) 
     for name in names:
         client = installers.by_name(name, extra_dirs=extra)
         if client is None:
-            hint = installers.PLUGIN_HOSTS.get(name)
-            if hint:
-                _err(f"{name} needs its own adapter, which this installer does not ship yet. See docs/adding-an-agent.md.")
-            else:
-                known = ", ".join(c.name for c in installers.all_clients())
-                _err(f"Unknown client \"{name}\". Known: {known}")
+            known = ", ".join(c.name for c in installers.all_clients())
+            _err(f"Unknown client \"{name}\". Known: {known}")
             return []
         chosen.append(client)
     return chosen

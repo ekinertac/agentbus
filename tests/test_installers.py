@@ -192,3 +192,37 @@ class TestPi(InstallerCase):
         self.assertFalse(pi.installed())
         pi.install()
         self.assertEqual((ext / "agentbus").resolve(), pi.adapter_source)
+
+
+class TestOpencode(InstallerCase):
+    def test_writes_a_shim_that_imports_the_real_adapter_and_registers_it(self):
+        oc = installers.by_name("opencode", self.home)
+        oc.install()
+        shim = oc.shim_path.read_text()
+        self.assertIn("@opencode-ai/plugin", shim)
+        self.assertIn(str(oc.adapter_source), shim)
+        config = json.loads(oc.config_path.read_text())
+        self.assertIn(oc._plugin_url(), config["plugin"])
+
+    def test_keeps_the_users_other_plugins_and_settings(self):
+        oc = installers.by_name("opencode", self.home)
+        oc.config_path.parent.mkdir(parents=True, exist_ok=True)
+        oc.config_path.write_text(json.dumps({
+            "plugin": ["some-other-plugin"],
+            "theme": "dark",
+        }))
+        oc.install()
+        config = json.loads(oc.config_path.read_text())
+        self.assertIn("some-other-plugin", config["plugin"])
+        self.assertIn(oc._plugin_url(), config["plugin"])
+        self.assertEqual(config["theme"], "dark")
+        oc.uninstall()
+        config = json.loads(oc.config_path.read_text())
+        self.assertEqual(config["plugin"], ["some-other-plugin"])
+
+    def test_a_missing_shim_makes_install_incomplete_even_with_the_entry_present(self):
+        oc = installers.by_name("opencode", self.home)
+        oc.install()
+        oc.shim_path.unlink()
+        self.assertFalse(oc.installed())
+        self.assertTrue(oc.install().changed)

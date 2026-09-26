@@ -135,8 +135,8 @@ describe("source health", () => {
   // so the shape is checked directly.
   test("no identifier is declared twice at the top level", () => {
     const declared = new Map<string, number>();
-    for (const file of ["core.ts", "index.ts"]) {
-      const src = fs.readFileSync(path.join(import.meta.dir, file), "utf8");
+    for (const file of ["ts/core.ts", "pi/index.ts", "opencode/index.ts"]) {
+      const src = fs.readFileSync(path.join(import.meta.dir, "..", file), "utf8");
       for (const m of src.matchAll(/^export (?:type|interface|const|function|class) (\w+)/gm)) {
         const key = `${file}:${m[1]}`;
         declared.set(key, (declared.get(key) ?? 0) + 1);

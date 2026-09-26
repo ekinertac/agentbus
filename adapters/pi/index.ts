@@ -15,8 +15,9 @@
  * Unlike the MCP adapter, pi can be interrupted: an inbound message is pushed straight into the
  * session with sendUserMessage, so nothing is spooled and nothing has to be polled.
  *
- * Protocol and file formats live in core.ts (pure, tested with `bun test`). This file is only pi
- * glue. `agentbus install pi` symlinks this directory into pi's extensions folder; a wrapper that
+ * Protocol and file formats live in ../ts/core.ts, shared with the opencode adapter. This file is
+ * only pi glue. The import crosses out of the symlinked extension directory, which works because
+ * module resolution follows the real path; it is checked by a live pi run, not just by bun. `agentbus install pi` symlinks this directory into pi's extensions folder; a wrapper that
  * sets PI_CODING_AGENT_DIR keeps its extensions elsewhere, so pass --agent-dir for each one.
  *
  * Nothing here can break a turn: every filesystem/socket failure is caught and reported
@@ -30,7 +31,7 @@ import * as net from "node:net";
 import {
   deriveName, displayName, listen, newToken, peers, procStart, readRegistry, removeFiles, resolveTarget,
   sendUser, sockPath, writeKey, writeRegistry, PEER_PROTOCOL, type Registry,
-} from "./core";
+} from "../ts/core";
 
 export default function (pi: ExtensionAPI) {
   const pid = process.pid;

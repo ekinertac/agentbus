@@ -388,6 +388,96 @@ class Pi(Client):
         return Result(self.name, True, "removed " + ", ".join(str(link) for link in present))
 
 
+class Opencode(Client):
+    """
+    opencode's plugin resolves @opencode-ai/plugin only from files under ~/.config/opencode, so the
+    real module (adapters/opencode/index.ts, checked out wherever the repo lives) cannot be loaded
+    directly. A shim there imports it by absolute path and supplies the tool() function opencode
+    installs for its own plugins.
+
+    The global plugin directory is not auto-scanned either, so the shim also needs an entry in the
+    `plugin` array of opencode.json, or the file exists and does nothing.
+    """
+
+    name = "opencode"
+    label = "opencode"
+
+    @property
+    def config_path(self) -> Path:
+        return self.home / ".config/opencode/opencode.json"
+
+    @property
+    def shim_path(self) -> Path:
+        return self.home / ".config/opencode/plugin/agentbus.ts"
+
+    @property
+    def adapter_source(self) -> Path:
+        return Path(__file__).resolve().parent.parent / "adapters" / "opencode" / "index.ts"
+
+    def present(self) -> bool:
+        return (self.home / ".config/opencode").exists() or shutil.which("opencode") is not None
+
+    def shim(self) -> str:
+        lines = [
+            "// agentbus: cross-session messaging shim, written by `agentbus install opencode`.",
+            "// @opencode-ai/plugin only resolves from under ~/.config/opencode, so the real plugin",
+            "// (in the agentbus checkout) cannot be imported directly; this file bridges the two.",
+            'import { tool } from "@opencode-ai/plugin";',
+            f'import make from "{self.adapter_source}";',
+            "export default make(tool);",
+        ]
+        return "\n".join(lines) + "\n"
+
+    def _plugin_url(self) -> str:
+        return f"file://{self.shim_path}"
+
+    def _load_config(self) -> Dict:
+        try:
+            return json.loads(self.config_path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def installed(self) -> bool:
+        if not self.shim_path.exists() or self.shim_path.read_text() != self.shim():
+            return False
+        return self._plugin_url() in self._load_config().get("plugin", [])
+
+    def install(self, dry_run: bool = False) -> Result:
+        if self.installed():
+            return Result(self.name, False, f"already configured in {self.config_path}")
+        if dry_run:
+            return Result(self.name, True,
+                          f"would write {self.shim_path} and register it in {self.config_path}")
+        self.shim_path.parent.mkdir(parents=True, exist_ok=True)
+        self.shim_path.write_text(self.shim())
+        config = self._load_config()
+        saved = backup(self.config_path)
+        plugins = config.setdefault("plugin", [])
+        if self._plugin_url() not in plugins:
+            plugins.append(self._plugin_url())
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        self.config_path.write_text(json.dumps(config, indent=2) + "\n")
+        return Result(self.name, True,
+                      f"wrote {self.shim_path} and registered it in {self.config_path}", saved)
+
+    def uninstall(self, dry_run: bool = False) -> Result:
+        had_entry = self._plugin_url() in self._load_config().get("plugin", [])
+        had_shim = self.shim_path.exists()
+        if not had_entry and not had_shim:
+            return Result(self.name, False, "nothing to remove")
+        if dry_run:
+            return Result(self.name, True, f"would remove the plugin entry and {self.shim_path}")
+        saved = None
+        if had_entry:
+            config = self._load_config()
+            saved = backup(self.config_path)
+            config["plugin"] = [u for u in config.get("plugin", []) if u != self._plugin_url()]
+            self.config_path.write_text(json.dumps(config, indent=2) + "\n")
+        if had_shim:
+            self.shim_path.unlink()
+        return Result(self.name, True, f"removed the plugin entry and {self.shim_path}", saved)
+
+
 class ClaudeCode(Client):
     """Claude Code owns the protocol; it needs nothing installed to see other agents."""
 
@@ -407,11 +497,7 @@ class ClaudeCode(Client):
         return Result(self.name, False, "nothing to remove")
 
 
-CLIENTS = [ClaudeCode, Pi, Kiro, Codex, Gemini, Cursor]
-# Hosts with a plugin API whose adapter is not in this repo yet.
-PLUGIN_HOSTS = {"opencode": "opencode"}
-
-
+CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor]
 def all_clients(home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> List[Client]:
     return [
         cls(home, extra_dirs) if cls is Pi else cls(home)  # type: ignore[call-arg]

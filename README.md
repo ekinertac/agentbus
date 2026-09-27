@@ -31,6 +31,49 @@ tool call the model makes on its own (`send_to_claude`, `list_claude_sessions`,
 up: a config entry for MCP-based clients, a symlinked adapter for pi and opencode. Run `agentbus
 doctor` afterward to check it took.
 
+## Manual MCP setup
+
+`agentbus install` is the automated version of this. For a host it doesn't recognize yet, or if
+you'd rather wire it up yourself, any MCP host that can spawn a stdio server should point at:
+
+```json
+{
+  "mcpServers": {
+    "agentbus": {
+      "command": "agentbus",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+That's the shape once `agentbus-cli` is pip-installed. Running straight from a checkout instead
+(no install step) needs `python3` as the command and `PYTHONPATH` pointing at the checkout, since
+a spawned host process doesn't inherit your shell's environment:
+
+```json
+{
+  "mcpServers": {
+    "agentbus": {
+      "command": "/path/to/python3",
+      "args": ["-m", "agentbus", "mcp"],
+      "env": { "PYTHONPATH": "/path/to/agentbus" }
+    }
+  }
+}
+```
+
+The host's own name over MCP decides the address prefix (`ki-`, `cx-`, `ag-`, …), picked up
+automatically from the standard MCP `initialize` handshake, or falls back to the generic `ab-`
+prefix if the host isn't one we recognize yet (see the client table above). Set `AGENTBUS_NAME` in
+that same `env` block to pick the name yourself instead of deriving it from the working directory.
+
+Once it's wired up, the host gets three tools: `list_claude_sessions`, `send_to_claude`, and
+`check_messages`. A host that runs its own hooks can also call `agentbus drain` from one to pull
+messages automatically instead of waiting on the model to call `check_messages`; kiro's own config
+(written by `agentbus install kiro`) does exactly this. See
+[`docs/protocol.md`](docs/protocol.md) for the wire format underneath all of this.
+
 ## Why this exists
 
 Claude Code sessions on the same machine can already message each other; it's built in, just

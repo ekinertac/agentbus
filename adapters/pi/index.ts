@@ -15,10 +15,14 @@
  * Unlike the MCP adapter, pi can be interrupted: an inbound message is pushed straight into the
  * session with sendUserMessage, so nothing is spooled and nothing has to be polled.
  *
- * Protocol and file formats live in ../ts/core.ts, shared with the opencode adapter. This file is
- * only pi glue. The import crosses out of the symlinked extension directory, which works because
- * module resolution follows the real path; it is checked by a live pi run, not just by bun. `agentbus install pi` symlinks this directory into pi's extensions folder; a wrapper that
- * sets PI_CODING_AGENT_DIR keeps its extensions elsewhere, so pass --agent-dir for each one.
+ * Protocol and file formats live in ../ts/core.ts, shared with the opencode adapter, imported here
+ * as ./core: a symlink at core.ts pointing at ../ts/core.ts, checked into git. A plain relative
+ * import that crosses OUT of a symlinked directory (`../ts/core`) does not survive `agentbus
+ * install pi` symlinking this whole directory into a pi extensions dir -- confirmed against a
+ * real pig session, "Cannot find module '../ts/core'" -- because pi/bun does not realpath a
+ * directory symlink before resolving a relative import from inside it. `bun test` never caught
+ * this; only a live pi run pointed at a symlinked extensions dir did. A wrapper that sets
+ * PI_CODING_AGENT_DIR keeps its extensions elsewhere, so pass --agent-dir for each one.
  *
  * Nothing here can break a turn: every filesystem/socket failure is caught and reported
  * with ctx.ui.notify, then the extension keeps running without peer messaging.
@@ -31,7 +35,7 @@ import * as net from "node:net";
 import {
   deriveName, displayName, listen, newToken, peers, procStart, readRegistry, removeFiles, resolveTarget,
   sendUser, sockPath, writeKey, writeRegistry, PEER_PROTOCOL, type Registry,
-} from "../ts/core";
+} from "./core";
 
 export default function (pi: ExtensionAPI) {
   const pid = process.pid;

@@ -47,17 +47,28 @@ you'd rather wire it up yourself, any MCP host that can spawn a stdio server sho
 }
 ```
 
-That's the shape once `agentbus-cli` is pip-installed. Running straight from a checkout instead
-(no install step) needs `python3` as the command and `PYTHONPATH` pointing at the checkout, since
-a spawned host process doesn't inherit your shell's environment:
+That's the shape once `agentbus-cli` is pip-installed. No install step at all, straight off
+GitHub, via [`uv`](https://docs.astral.sh/uv/):
 
 ```json
 {
   "mcpServers": {
     "agentbus": {
-      "command": "/path/to/python3",
-      "args": ["-m", "agentbus", "mcp"],
-      "env": { "PYTHONPATH": "/path/to/agentbus" }
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/ekinertac/agentbus", "agentbus", "mcp"]
+    }
+  }
+}
+```
+
+Working from a local checkout instead, same idea, point `--from` at the directory:
+
+```json
+{
+  "mcpServers": {
+    "agentbus": {
+      "command": "uvx",
+      "args": ["--from", "/path/to/agentbus", "agentbus", "mcp"]
     }
   }
 }
@@ -65,8 +76,9 @@ a spawned host process doesn't inherit your shell's environment:
 
 The host's own name over MCP decides the address prefix (`ki-`, `cx-`, `ag-`, …), picked up
 automatically from the standard MCP `initialize` handshake, or falls back to the generic `ab-`
-prefix if the host isn't one we recognize yet (see the client table above). Set `AGENTBUS_NAME` in
-that same `env` block to pick the name yourself instead of deriving it from the working directory.
+prefix if the host isn't one we recognize yet (see the client table above). Add an `"env": {
+"AGENTBUS_NAME": "whatever" }` to any of these entries to pick the name yourself instead of
+deriving it from the working directory.
 
 Once it's wired up, the host gets three tools: `list_claude_sessions`, `send_to_claude`, and
 `check_messages`. A host that runs its own hooks can also call `agentbus drain` from one to pull

@@ -260,6 +260,30 @@ class Antigravity(JsonMcpClient):
         return shutil.which("agy") is not None or shutil.which("antigravity") is not None
 
 
+class Crush(JsonMcpClient):
+    """
+    Crush's primary config format is `crushrc`, a script its own embedded bash interpreter
+    executes (an `mcp add ...` builtin only exists inside that interpreter, confirmed: running
+    `crush mcp add` from a real shell just errors "Unknown command"). But it also still supports a
+    plain JSON file, `~/.config/crush/crush.json` ("legacy but supported", per its own docs, and
+    the one format that doesn't require generating or safely round-tripping a bash script), keyed
+    `mcp` rather than `mcpServers`, with a required `"type": "stdio"` per entry.
+    """
+
+    name = "crush"
+    label = "Crush"
+    config_relpath = ".config/crush/crush.json"
+    servers_key = "mcp"
+    extra_server_fields = {"type": "stdio"}
+
+    def present(self) -> bool:
+        return (
+            shutil.which("crush") is not None
+            or (self.home / ".config/crush").exists()
+            or (self.home / ".crush").exists()
+        )
+
+
 class Codex(Client):
     """Codex keeps its config in TOML, which the stdlib cannot write, so the block is managed by text."""
 
@@ -606,7 +630,7 @@ class ClaudeCode(Client):
         return Result(self.name, False, "nothing to remove")
 
 
-CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor, Antigravity, Hermes]
+CLIENTS = [ClaudeCode, Pi, Opencode, Kiro, Codex, Gemini, Cursor, Antigravity, Hermes, Crush]
 def all_clients(home: Optional[Path] = None, extra_dirs: Optional[List[Path]] = None) -> List[Client]:
     return [
         cls(home, extra_dirs) if cls is Pi else cls(home)  # type: ignore[call-arg]

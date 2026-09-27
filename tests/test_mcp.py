@@ -15,6 +15,7 @@ import time
 import unittest
 from pathlib import Path
 
+from agentbus import mcp
 from agentbus import protocol as p
 from agentbus import spool
 
@@ -116,6 +117,57 @@ class TestHandshake(unittest.TestCase):
         self.assertIn("No live session named", res["result"]["content"][0]["text"])
 
 
+class TestReapStaleEntries(unittest.TestCase):
+    """
+    Some hosts (crush, confirmed) kill the MCP server with a signal our own handlers never see,
+    which only SIGKILL explains: it leaves the registry entry and key behind with no way for this
+    process to react. The next server that starts sweeps for exactly that, scoped to entries this
+    code itself would have written.
+    """
+
+    def _write_dead_entry(self, pid: int, entrypoint: str = "agentbus") -> None:
+        # Built by hand rather than via new_registry(): that shells out to `ps -p <pid>` for
+        # procStart, which fails outright for a pid that was never real.
+        sock = str(p.sock_path(pid))
+        entry = {
+            "pid": pid, "sessionId": f"agentbus-{pid}", "cwd": "/tmp", "startedAt": 0,
+            "procStart": "", "version": entrypoint, "peerProtocol": p.PEER_PROTOCOL,
+            "peerFeatures": [], "kind": "interactive", "entrypoint": entrypoint,
+            "pidDomain": "darwin", "messagingSocketPath": sock, "name": "ab-stale",
+            "nameSource": "derived", "nameSince": 0, "status": "idle", "updatedAt": 0,
+            "statusUpdatedAt": 0,
+        }
+        p.write_registry(entry)
+        # write_key() also shells out to `ps -p <pid>` for procStart; write the file directly.
+        p.key_path(pid, sock).write_text(json.dumps({"peerToken": "ab" * 16}))
+
+    def test_reaps_a_dead_agentbus_entry(self):
+        dead_pid = 2**30  # never a real pid
+        self._write_dead_entry(dead_pid)
+        self.assertTrue(p.registry_path(dead_pid).exists())
+        mcp._reap_stale_agentbus_entries()
+        self.assertFalse(p.registry_path(dead_pid).exists())
+
+    def test_leaves_a_live_entry_alone(self):
+        # os.getpid() (this test process) is alive by definition.
+        self._write_dead_entry(os.getpid())
+        try:
+            mcp._reap_stale_agentbus_entries()
+            self.assertTrue(p.registry_path(os.getpid()).exists())
+        finally:
+            p.remove_files(os.getpid(), str(p.sock_path(os.getpid())))
+
+    def test_leaves_a_dead_entry_from_a_different_entrypoint_alone(self):
+        # A Claude Code session's own stale file is never ours to clean up.
+        dead_pid = 2**30 - 1
+        self._write_dead_entry(dead_pid, entrypoint="cli")
+        try:
+            mcp._reap_stale_agentbus_entries()
+            self.assertTrue(p.registry_path(dead_pid).exists())
+        finally:
+            p.remove_files(dead_pid, str(p.sock_path(dead_pid)))
+
+
 class TestBusMembership(unittest.TestCase):
     def test_registers_with_the_hosts_prefix_and_cleans_up_on_exit(self):
         host = Host()
@@ -153,6 +205,14 @@ class TestBusMembership(unittest.TestCase):
         self.addCleanup(host.close)
         host.initialize("antigravity-client")
         self.assertTrue(host.wait_for_registry()["name"].startswith("ag-"))
+
+    def test_crush_is_recognised_by_the_name_it_actually_reports(self):
+        # crush 0.96.1 sends "crush", verified against a live tool call, for once matching the
+        # binary name.
+        host = Host()
+        self.addCleanup(host.close)
+        host.initialize("crush")
+        self.assertTrue(host.wait_for_registry()["name"].startswith("cr-"))
 
     def test_cleans_up_when_killed_rather_than_closed(self):
         # codex ends an MCP subprocess with a signal rather than closing stdin (confirmed against

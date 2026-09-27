@@ -326,3 +326,19 @@ class TestHermes(InstallerCase):
     def test_uninstalling_something_never_installed_is_not_an_error(self):
         result = self.hermes.uninstall()
         self.assertFalse(result.changed)
+
+
+class TestCrush(InstallerCase):
+    def test_writes_the_mcp_key_not_mcpServers_with_a_required_type_field(self):
+        # Confirmed against crush's own schema.json: the top-level key is "mcp", and each entry
+        # requires "type" (crush.json has no default for it the way most other hosts' files do).
+        crush = installers.by_name("crush", self.home)
+        crush.install()
+        config = json.loads(crush.config_path.read_text())
+        self.assertIn("agentbus", config["mcp"])
+        self.assertNotIn("mcpServers", config)
+        self.assertEqual(config["mcp"]["agentbus"]["type"], "stdio")
+
+    def test_config_path_matches_the_documented_legacy_location(self):
+        crush = installers.by_name("crush", self.home)
+        self.assertEqual(crush.config_path, self.home / ".config/crush/crush.json")

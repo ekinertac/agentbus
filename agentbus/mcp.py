@@ -53,6 +53,8 @@ HOST_PREFIXES = {
     # Verified against antigravity-cli 1.2.11: it reports "antigravity-client".
     "antigravity-client": "ag-",
     "antigravity": "ag-",
+    # crush 0.96.1: the one host so far that reports its actual name, unsurprising.
+    "crush": "cr-",
 }
 DEFAULT_PREFIX = "ab-"
 PROTOCOL_VERSION = "2025-06-18"
@@ -61,6 +63,36 @@ PROTOCOL_VERSION = "2025-06-18"
 def log(message: str) -> None:
     sys.stderr.write(f"[agentbus] {message}\n")
     sys.stderr.flush()
+
+
+def _reap_stale_agentbus_entries() -> None:
+    """
+    Clean up registry/key files a PREVIOUS agentbus server left behind because its host killed it
+    with an uncatchable signal instead of closing stdin. Confirmed against crush 0.96.1: our
+    SIGTERM/SIGINT/SIGHUP handlers and atexit hook (added for codex's own version of this) never
+    ran, and the process was nonetheless gone, which only SIGKILL (or an OS-level kill, unblockable
+    by any code in this process) explains. There is no signal-handler fix for that, so instead
+    every new server sweeps for dead-pid entries under its own entrypoint before registering.
+    Scoped to entrypoint == "agentbus" so a Claude Code session's own files are never touched.
+    """
+    try:
+        names = os.listdir(p.SESSIONS_DIR)
+    except OSError:
+        return
+    for name in names:
+        if not name.endswith(".json") or not name[:-5].isdigit():
+            continue
+        path = p.SESSIONS_DIR / name
+        try:
+            entry = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        pid = entry.get("pid")
+        if entry.get("entrypoint") != "agentbus" or not isinstance(pid, int):
+            continue
+        if not p.is_alive(pid):
+            log(f"reaping stale entry for dead pid {pid} ({entry.get('name', '?')})")
+            p.remove_files(pid, entry.get("messagingSocketPath") or str(p.sock_path(pid)))
 
 
 class Server:
@@ -93,6 +125,7 @@ class Server:
         with self._lock:
             if self.listener is not None:
                 return
+            _reap_stale_agentbus_entries()
             prefix = HOST_PREFIXES.get(host.lower(), DEFAULT_PREFIX)
             token = p.new_token()
             self.listener = p.listen(self.sock, token, self.on_message, log)

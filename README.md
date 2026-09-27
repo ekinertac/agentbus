@@ -94,9 +94,10 @@ messages automatically instead of waiting on the model to call `check_messages`;
 
 ## Why this exists
 
-Claude Code sessions on the same machine can already message each other; it's built in, just
-undocumented. `agentbus` reverse-engineers that protocol and speaks it from the outside, so a pi
-or kiro or codex session looks like just another Claude Code session to everyone else. No new
+Claude Code sessions on the same machine can already message each other, that part is a real,
+documented feature (`SendMessage`, `ListAgents`). The wire protocol underneath it isn't published
+anywhere, though, so `agentbus` reverse-engineers that and speaks it from the outside, making a pi
+or kiro or codex session look like just another Claude Code session to everyone else. No new
 protocol, no daemon, no server to run: it rides the one Claude Code already ships.
 
 See [`docs/protocol.md`](docs/protocol.md) for the reverse-engineered wire format, if you want to

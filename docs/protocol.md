@@ -1,11 +1,14 @@
 # Claude Code's local session-messaging protocol
 
-This is undocumented anywhere Anthropic publishes. Everything here was worked out by reading the
-`claude` binary (version 2.1.278 through 2.1.283 at the time of writing) with `strings` and
-reading the minified JS it unpacks to, then confirmed by building a second implementation
-(`agentbus/protocol.py`) against it and watching real sessions talk to each other. It can change
-without notice on any Claude Code release; `agentbus doctor` checks the `peerProtocol` field
-described below and flags a version it doesn't recognize.
+The feature itself, cross-session messaging via `SendMessage` and `ListAgents`, is real and
+documented: it has its own entries in Anthropic's [CHANGELOG.md](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)
+going back a while. What isn't published anywhere is the wire format underneath it, which is what
+this file covers. Everything here was worked out by reading the `claude` binary (version 2.1.278
+through 2.1.283 at the time of writing) with `strings` and reading the minified JS it unpacks to,
+then confirmed by building a second implementation (`agentbus/protocol.py`) against it and
+watching real sessions talk to each other. It can change without notice on any Claude Code
+release; `agentbus doctor` checks the `peerProtocol` field described below and flags a version it
+doesn't recognize.
 
 If you just want to use the messaging, you don't need this file, `agentbus install` does the work.
 This is for writing a new adapter, or for understanding what's actually happening when two

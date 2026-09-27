@@ -36,6 +36,24 @@ doctor` afterward to check it took.
 `agentbus install` is the automated version of this. For a host it doesn't recognize yet, or if
 you'd rather wire it up yourself, any MCP host that can spawn a stdio server should point at:
 
+No install step at all, via [`uv`](https://docs.astral.sh/uv/) (note the `--from`: the PyPI
+package is `agentbus-cli`, the command it provides is `agentbus`, so a bare `uvx agentbus-cli`
+doesn't resolve, `uv` will tell you as much):
+
+```json
+{
+  "mcpServers": {
+    "agentbus": {
+      "command": "uvx",
+      "args": ["--from", "agentbus-cli", "agentbus", "mcp"]
+    }
+  }
+}
+```
+
+That's the zero-install default. Once `pip install agentbus-cli` (or `uv add agentbus-cli` inside
+a project of your own) has actually put it on your `PATH`, it's just:
+
 ```json
 {
   "mcpServers": {
@@ -47,21 +65,9 @@ you'd rather wire it up yourself, any MCP host that can spawn a stdio server sho
 }
 ```
 
-That's the shape once `agentbus-cli` is pip-installed. No install step at all, straight off
-GitHub, via [`uv`](https://docs.astral.sh/uv/):
-
-```json
-{
-  "mcpServers": {
-    "agentbus": {
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/ekinertac/agentbus", "agentbus", "mcp"]
-    }
-  }
-}
-```
-
-Working from a local checkout instead, same idea, point `--from` at the directory:
+Working from a local checkout instead, before a change has made it into a release, same `uvx`
+idea, point `--from` at the directory (or `git+https://github.com/ekinertac/agentbus` for
+unreleased `master`):
 
 ```json
 {

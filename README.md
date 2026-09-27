@@ -3,8 +3,8 @@
 [![test](https://github.com/ekinertac/agentbus/actions/workflows/test.yml/badge.svg)](https://github.com/ekinertac/agentbus/actions/workflows/test.yml)
 
 Lets coding agents on the same machine message each other. Claude Code, pi, opencode, kiro-cli,
-codex, antigravity, hermes, and anything else that speaks MCP show up as named peers you can
-address from any of the others.
+codex, antigravity, hermes, crush, and anything else that speaks MCP show up as named peers you
+can address from any of the others.
 
 ```console
 $ agentbus list
@@ -113,13 +113,14 @@ speak it directly or write your own adapter.
 | codex | MCP server, TOML config block | `cx-` |
 | antigravity-cli | MCP server, JSON config | `ag-` |
 | hermes (NousResearch) | MCP server, driven through `hermes mcp` | generic (see below) |
+| crush (Charm) | MCP server, JSON config (legacy `crush.json` format) | `cr-` |
 | any other MCP host | MCP server, config format varies | generic |
 
 An unrecognized host still works, it just gets a generic prefix instead of a short one. Adding a
 short prefix for a new host means confirming what it actually reports as its MCP client name
-first: every host so far has surprised us here (kiro reports `Q DEV CLI`, codex reports
-`codex-mcp-client`, hermes reports the unusably generic `mcp`), so this is never assumed. See
-[`docs/roadmap.md`](docs/roadmap.md) for the client backlog and what's been ruled out.
+first: every host so far has surprised us here except crush (kiro reports `Q DEV CLI`, codex
+reports `codex-mcp-client`, hermes reports the unusably generic `mcp`), so this is never assumed.
+See [`docs/roadmap.md`](docs/roadmap.md) for the client backlog and what's been ruled out.
 
 ## Delivery model
 

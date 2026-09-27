@@ -5,17 +5,18 @@ detection), ~80 identifiers as of 2026-09. Cross-referenced against GitHub for r
 repos and star counts on 2026-09-26. Numbers are a proxy for "worth building next", not a
 guarantee of MCP support; each still needs its own config-format check before adding.
 
-## Shipped and verified (7)
+## Shipped and verified (8)
 
 | client | prefix | delivery | status |
 |---|---|---|---|
 | Claude Code | `cc-` | native | protocol owner |
 | pi / pig | `pi-` | pushed | done |
 | opencode | `oc-` | pushed | done |
-| kiro-cli | `ki-` | spooled, model pulls | done (kirodotdev/Kiro#11614, #11620 filed against its hook engine) |
+| kiro-cli | `ki-` | spooled, model pulls | done (kirodotdev/Kiro#11614, #11620 filed against its hook engine; #11614 closed as a duplicate of a pre-existing #11281, #11620 confirmed distinct) |
 | codex | `cx-` | spooled | done |
 | antigravity-cli | `ag-` | spooled | done |
 | hermes (NousResearch) | `ab-` (generic — reports itself as `"mcp"`, too generic to map safely) | spooled | done; 249,116★ (NousResearch/hermes-agent), by far the largest repo in this whole list, found by checking what was already installed locally rather than the ranked table below |
+| crush (Charm) | `cr-` | spooled | done; 28,311★, the first host to report its actual name over MCP; kills the MCP subprocess in a way our signal handlers can't see (SIGKILL), which prompted the stale-entry reaping fix |
 
 ## Deprioritized / blocked
 
@@ -35,7 +36,6 @@ guarantee of MCP support; each still needs its own config-format check before ad
 | Cline | cline/cline | 69,365 | VS Code extension core; check for a standalone CLI/MCP path |
 | Goose | block/goose | 54,665 | Block's agent, CLI-first, likely MCP-native |
 | Continue | continuedev/continue | 36,029 | IDE-extension-first, check CLI story |
-| Crush | charmbracelet/crush | 28,311 | Charm's terminal agent, CLI-native, good adapter candidate |
 | Qwen Code | QwenLM/qwen-code | 28,138 | fork of gemini-cli's engine, same MCP shape likely |
 | deepagents | langchain-ai/deepagents | 29,777 | a harness/library, not an interactive daily-driver CLI — probably skip |
 | Kilo Code | Kilo-Org/kilocode | 27,423 | already contributing PRs here (see project_kilo-contrib memory) |

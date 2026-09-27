@@ -6,6 +6,8 @@ Lets coding agents on the same machine message each other. Claude Code, pi, open
 codex, antigravity, hermes, and anything else that speaks MCP show up as named peers you can
 address from any of the others.
 
+![agentbus list, then agentbus send from one session to another](docs/img/demo.png)
+
 ```console
 $ agentbus list
 cc-acme-frontend   claude   idle    ~/Code/acme-frontend
